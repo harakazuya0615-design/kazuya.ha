@@ -1,0 +1,1690 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>勤怠管理アプリ</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', sans-serif;
+    background: #f0f2f5;
+    color: #333;
+    min-height: 100vh;
+  }
+
+  /* Header */
+  header {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    color: white;
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+  }
+  header h1 { font-size: 20px; font-weight: 700; letter-spacing: 0.05em; }
+  header h1 span { color: #e94560; }
+
+  .tab-btns {
+    display: flex;
+    gap: 8px;
+  }
+  .tab-btn {
+    padding: 8px 20px;
+    border: 2px solid rgba(255,255,255,0.3);
+    background: transparent;
+    color: white;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+  }
+  .tab-btn.active {
+    background: #e94560;
+    border-color: #e94560;
+  }
+  .tab-btn:hover:not(.active) { background: rgba(255,255,255,0.1); }
+
+  /* Main layout */
+  .container {
+    max-width: 1200px;
+    margin: 24px auto;
+    padding: 0 16px;
+  }
+
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* Stats bar */
+  .stats-bar {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .stat-card {
+    background: white;
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  .stat-card .val {
+    font-size: 28px;
+    font-weight: 700;
+    color: #0f3460;
+  }
+  .stat-card .lbl { font-size: 12px; color: #888; margin-top: 4px; }
+  .stat-card.green .val { color: #27ae60; }
+  .stat-card.red .val { color: #e74c3c; }
+  .stat-card.orange .val { color: #e67e22; }
+
+  /* Salary card */
+  .salary-card {
+    background: linear-gradient(135deg, #fff8dc 0%, #fef3c7 100%);
+    border: 2px solid #fdcb6e;
+    border-radius: 14px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 10px rgba(253, 203, 110, 0.2);
+  }
+  .sal-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    border-bottom: 1px dashed #d4a017;
+    padding-bottom: 8px;
+    margin-bottom: 10px;
+  }
+  .sal-title { font-size: 14px; font-weight: 700; color: #7a5e00; }
+  .sal-total { font-size: 26px; font-weight: 800; color: #b8860b; letter-spacing: 0.02em; }
+  .sal-breakdown { display: grid; gap: 6px; }
+  .sal-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    color: #5d4e00;
+  }
+  .sal-row span:last-child { font-weight: 600; }
+  .sal-row.sal-sub {
+    border-top: 1px dotted #d4a017;
+    padding-top: 6px;
+    margin-top: 4px;
+    font-size: 12px;
+    color: #888;
+  }
+
+  /* Year salary chart */
+  .year-salary-card {
+    background: linear-gradient(135deg, #fff8dc 0%, #fef3c7 100%);
+    border: 2px solid #fdcb6e;
+    border-radius: 14px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 10px rgba(253, 203, 110, 0.2);
+  }
+  .ys-total-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px dashed #d4a017;
+  }
+  .ys-total-label { font-size: 14px; font-weight: 700; color: #7a5e00; }
+  .ys-total-val { font-size: 32px; font-weight: 800; color: #b8860b; }
+  .ys-total-sub { font-size: 11px; color: #888; margin-left: 6px; }
+  .ys-month-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+    height: 100px;
+    margin-bottom: 6px;
+  }
+  .ys-month-bar {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+  .ys-bar-fill {
+    width: 100%;
+    background: linear-gradient(180deg, #b8860b, #fdcb6e);
+    border-radius: 3px 3px 0 0;
+    min-height: 2px;
+  }
+  .ys-bar-num { font-size: 9px; color: #7a5e00; font-weight: 600; }
+  .ys-month-labels {
+    display: flex;
+    gap: 4px;
+  }
+  .ys-month-labels div {
+    flex: 1;
+    text-align: center;
+    font-size: 10px;
+    color: #888;
+  }
+
+  /* Month navigation */
+  .month-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .nav-btn {
+    width: 36px; height: 36px;
+    border: none;
+    background: white;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 16px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    transition: all 0.2s;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .nav-btn:hover { background: #0f3460; color: white; }
+  .month-title { font-size: 22px; font-weight: 700; color: #1a1a2e; min-width: 180px; text-align: center; }
+
+  /* Calendar */
+  .calendar-wrap {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    overflow: hidden;
+  }
+  .cal-header {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    background: #1a1a2e;
+  }
+  .cal-header div {
+    text-align: center;
+    padding: 10px 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.7);
+    letter-spacing: 0.05em;
+  }
+  .cal-header div:first-child { color: #ff6b6b; }
+  .cal-header div:last-child { color: #74b9ff; }
+
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+  }
+  .cal-cell {
+    min-height: 90px;
+    border-right: 1px solid #f0f0f0;
+    border-bottom: 1px solid #f0f0f0;
+    padding: 6px;
+    cursor: pointer;
+    transition: background 0.15s;
+    position: relative;
+  }
+  .cal-cell:hover { background: #f8f9ff; }
+  .cal-cell.empty { background: #fafafa; cursor: default; }
+  .cal-cell.today { background: #fff9e6; }
+  .cal-cell.today .day-num { background: #e94560; color: white; border-radius: 50%; }
+
+  .day-num {
+    font-size: 13px;
+    font-weight: 600;
+    width: 24px; height: 24px;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 4px;
+  }
+  .cal-cell:nth-child(7n+1) .day-num { color: #e74c3c; }
+  .cal-cell:nth-child(7n) .day-num { color: #3498db; }
+
+  .record-badge {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 10px;
+    margin-top: 2px;
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .badge-present { background: #d5f5e3; color: #1e8449; }
+  .badge-absent { background: #fde8e8; color: #c0392b; }
+  .badge-late { background: #fef9e7; color: #d68910; }
+  .badge-leave { background: #e8eaf6; color: #5c6bc0; }
+  .badge-holiday { background: #f3e5f5; color: #7b1fa2; }
+
+  .work-hours {
+    font-size: 10px;
+    color: #666;
+    margin-top: 2px;
+  }
+
+  /* Modal */
+  .modal-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: white;
+    border-radius: 20px;
+    padding: 28px;
+    width: 360px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    animation: slideUp 0.25s ease;
+  }
+  @keyframes slideUp {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  .modal h3 { font-size: 18px; margin-bottom: 20px; color: #1a1a2e; }
+  .modal h3 span { color: #e94560; }
+
+  .form-row { margin-bottom: 16px; }
+  .form-row label { display: block; font-size: 12px; color: #888; margin-bottom: 6px; font-weight: 600; }
+  .form-row input, .form-row select, .form-row textarea {
+    width: 100%;
+    border: 1.5px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 9px 12px;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+    font-family: inherit;
+  }
+  .form-row input:focus, .form-row select:focus, .form-row textarea:focus {
+    border-color: #0f3460;
+  }
+  .form-row textarea { resize: vertical; min-height: 70px; }
+
+  .modal-btns {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+  }
+  .btn {
+    flex: 1;
+    padding: 11px;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    transition: all 0.2s;
+  }
+  .btn-primary { background: #0f3460; color: white; }
+  .btn-primary:hover { background: #1a1a2e; }
+  .btn-danger { background: #fde8e8; color: #c0392b; }
+  .btn-danger:hover { background: #e74c3c; color: white; }
+  .btn-cancel { background: #f5f5f5; color: #666; }
+  .btn-cancel:hover { background: #e0e0e0; }
+
+  /* Yearly view */
+  .year-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  .year-title { font-size: 28px; font-weight: 700; color: #1a1a2e; }
+
+  .year-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+
+  .mini-month {
+    background: white;
+    border-radius: 12px;
+    padding: 14px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  .mini-month-title {
+    font-size: 13px;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 8px;
+    color: #1a1a2e;
+  }
+  .mini-cal-header {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    margin-bottom: 4px;
+  }
+  .mini-cal-header span {
+    text-align: center;
+    font-size: 9px;
+    color: #aaa;
+    font-weight: 600;
+  }
+  .mini-cal-header span:first-child { color: #ff6b6b; }
+  .mini-cal-header span:last-child { color: #74b9ff; }
+  .mini-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1px;
+  }
+  .mini-cell {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .mini-cell:hover { opacity: 0.75; }
+  .mini-cell.empty { background: transparent; cursor: default; }
+  .mini-cell.mc-present { background: #d5f5e3; color: #1e8449; font-weight: 600; }
+  .mini-cell.mc-absent { background: #fde8e8; color: #c0392b; }
+  .mini-cell.mc-late { background: #fef9e7; color: #d68910; font-weight: 600; }
+  .mini-cell.mc-leave { background: #e8eaf6; color: #5c6bc0; }
+  .mini-cell.mc-holiday { background: #f3e5f5; color: #7b1fa2; }
+  .mini-cell.mc-today { outline: 2px solid #e94560; }
+  .mini-cell.mc-none { color: #ccc; }
+
+  .mini-month-stats {
+    margin-top: 8px;
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .mini-stat {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 8px;
+    font-weight: 600;
+  }
+  .ms-present { background: #d5f5e3; color: #1e8449; }
+  .ms-absent { background: #fde8e8; color: #c0392b; }
+  .ms-late { background: #fef9e7; color: #d68910; }
+
+  /* Year summary */
+  .year-summary {
+    background: white;
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  }
+  .year-summary h2 { font-size: 16px; color: #1a1a2e; margin-bottom: 16px; }
+  .year-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 10px;
+  }
+  .ys-item { text-align: center; }
+  .ys-val { font-size: 24px; font-weight: 700; }
+  .ys-lbl { font-size: 11px; color: #888; margin-top: 2px; }
+
+  /* Chart bar */
+  .chart-wrap {
+    background: white;
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  .chart-title { font-size: 14px; font-weight: 700; color: #1a1a2e; margin-bottom: 14px; }
+  .bar-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+    height: 80px;
+  }
+  .bar-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+  }
+  .bar-fill {
+    width: 100%;
+    background: linear-gradient(180deg, #0f3460, #1a4a8a);
+    border-radius: 3px 3px 0 0;
+    min-height: 2px;
+    transition: height 0.3s;
+  }
+  .bar-lbl { font-size: 9px; color: #aaa; }
+  .bar-val { font-size: 9px; color: #666; font-weight: 600; }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 24px; right: 24px;
+    background: #1a1a2e;
+    color: white;
+    padding: 12px 20px;
+    border-radius: 10px;
+    font-size: 14px;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.3s;
+    z-index: 9999;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast.success { background: #27ae60; }
+
+  @media (max-width: 768px) {
+    .stats-bar { grid-template-columns: repeat(2, 1fr); }
+    .year-grid { grid-template-columns: repeat(2, 1fr); }
+    .year-stats-grid { grid-template-columns: repeat(3, 1fr); }
+    header { flex-direction: column; gap: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>勤怠<span>管理</span>アプリ</h1>
+  <div class="tab-btns">
+    <button class="tab-btn active" onclick="switchView('monthly')">月間</button>
+    <button class="tab-btn" onclick="switchView('yearly')">年間</button>
+    <button class="tab-btn" onclick="openSettingsModal()" style="border-color:#fdcb6e">給与設定</button>
+    <button class="tab-btn" onclick="openSyncModal()" style="border-color:#74b9ff">同期</button>
+  </div>
+</header>
+
+<!-- Monthly View -->
+<div class="container">
+  <div id="view-monthly" class="view active">
+    <div class="stats-bar" id="month-stats"></div>
+    <div class="salary-card" id="salary-card" style="display:none"></div>
+
+    <div class="month-nav">
+      <button class="nav-btn" onclick="changeMonth(-1)">&#8249;</button>
+      <div class="month-title" id="month-title"></div>
+      <button class="nav-btn" onclick="changeMonth(1)">&#8250;</button>
+    </div>
+
+    <div class="calendar-wrap">
+      <div class="cal-header">
+        <div>日</div><div>月</div><div>火</div><div>水</div>
+        <div>木</div><div>金</div><div>土</div>
+      </div>
+      <div class="cal-grid" id="cal-grid"></div>
+    </div>
+  </div>
+
+  <!-- Yearly View -->
+  <div id="view-yearly" class="view">
+    <div class="year-nav">
+      <button class="nav-btn" onclick="changeYear(-1)">&#8249;</button>
+      <div class="year-title" id="year-title"></div>
+      <button class="nav-btn" onclick="changeYear(1)">&#8250;</button>
+    </div>
+
+    <div class="year-salary-card" id="year-salary-card" style="display:none"></div>
+
+    <div class="year-summary">
+      <h2>年間サマリー</h2>
+      <div class="year-stats-grid" id="year-stats"></div>
+    </div>
+
+    <div class="chart-wrap">
+      <div class="chart-title">月別出勤日数</div>
+      <div class="bar-chart" id="bar-chart"></div>
+    </div>
+
+    <div class="year-grid" id="year-grid"></div>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModalIfOutside(event)">
+  <div class="modal">
+    <h3 id="modal-title">勤怠入力 — <span id="modal-date"></span></h3>
+    <div class="form-row">
+      <label>ステータス</label>
+      <select id="f-status">
+        <option value="present">出勤</option>
+        <option value="absent">欠勤</option>
+        <option value="late">遅刻</option>
+        <option value="leave">有給休暇</option>
+        <option value="holiday">祝日・休日</option>
+      </select>
+    </div>
+    <div id="time-fields">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-row">
+          <label>出勤時刻</label>
+          <input type="time" id="f-in" value="09:00">
+        </div>
+        <div class="form-row">
+          <label>退勤時刻</label>
+          <input type="time" id="f-out" value="18:00">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-row">
+          <label>休憩時間（分）</label>
+          <input type="number" id="f-break" value="60" min="0" max="480">
+        </div>
+        <div class="form-row">
+          <label>残業時間（自動計算）</label>
+          <input type="text" id="f-overtime" readonly placeholder="自動計算" style="background:#f9f9f9">
+        </div>
+      </div>
+    </div>
+    <div class="form-row">
+      <label>備考</label>
+      <textarea id="f-note" placeholder="メモを入力..."></textarea>
+    </div>
+    <div class="modal-btns">
+      <button class="btn btn-danger" id="btn-delete" onclick="deleteRecord()">削除</button>
+      <button class="btn btn-cancel" onclick="closeModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveRecord()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings Modal -->
+<div class="modal-overlay" id="settings-overlay" onclick="closeSettingsIfOutside(event)">
+  <div class="modal" style="width:420px;max-height:90vh;overflow-y:auto">
+    <h3>給与<span> 設定</span></h3>
+    <p style="font-size:12px;color:#666;margin-bottom:16px;line-height:1.5">
+      時給制 or 月給制を選んで設定してください。残業・休日労働は自動計算されます。
+    </p>
+
+    <div class="form-row">
+      <label>給与形態</label>
+      <select id="s-mode" onchange="toggleSalaryMode()">
+        <option value="hourly">時給制</option>
+        <option value="monthly">月給制</option>
+      </select>
+    </div>
+
+    <div id="hourly-fields">
+      <div class="form-row">
+        <label>時給 (円)</label>
+        <input type="number" id="s-hourly" placeholder="1200" min="0" step="10">
+      </div>
+    </div>
+
+    <div id="monthly-fields" style="display:none">
+      <div class="form-row">
+        <label>基本給 (月額・円)</label>
+        <input type="number" id="s-monthly" placeholder="250000" min="0" step="1000">
+      </div>
+      <div class="form-row">
+        <label>残業計算用の時給 (円・空欄なら基本給÷160)</label>
+        <input type="number" id="s-ot-hourly" placeholder="自動計算" min="0" step="10">
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-row">
+        <label>残業倍率</label>
+        <input type="number" id="s-ot-rate" placeholder="1.25" min="1" step="0.05">
+      </div>
+      <div class="form-row">
+        <label>休日労働倍率</label>
+        <input type="number" id="s-hol-rate" placeholder="1.35" min="1" step="0.05">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <label>交通費 (1出勤あたり・円)</label>
+      <input type="number" id="s-transport" placeholder="0" min="0" step="10">
+    </div>
+
+    <div class="form-row">
+      <label>所定労働時間 (1日・時間)</label>
+      <input type="number" id="s-work-hours" placeholder="8" min="1" max="24" step="0.5">
+    </div>
+
+    <div style="background:#fffbea;padding:10px;border-radius:8px;font-size:11px;color:#7a5e00;line-height:1.6;margin-top:8px">
+      💡 残業は所定労働時間を超えた分に倍率を適用<br>
+      💡 休日労働は status=「祝日・休日」の日に時間を入力した場合に適用<br>
+      💡 控除（税・保険）は計算されません（額面ベース）
+    </div>
+
+    <div class="modal-btns">
+      <button class="btn btn-cancel" onclick="closeSettingsModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveSettings()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Sync Modal -->
+<div class="modal-overlay" id="sync-overlay" onclick="closeSyncIfOutside(event)">
+  <div class="modal" style="width:420px">
+    <h3>データ<span> 同期</span></h3>
+    <p style="font-size:12px;color:#666;margin-bottom:16px;line-height:1.5">
+      Google Drive 自動同期、または手動エクスポート/インポートが使えます。
+    </p>
+
+    <!-- Google Drive 自動同期 -->
+    <div style="border:2px solid #74b9ff;border-radius:10px;padding:14px;margin-bottom:12px;background:#f0f8ff">
+      <div style="font-weight:700;font-size:13px;margin-bottom:8px;color:#0f3460">☁️ Google Drive 自動同期</div>
+      <div style="font-size:11px;color:#666;margin-bottom:6px">OAuth Client ID:</div>
+      <input type="text" id="drive-client-id" placeholder="xxxxx.apps.googleusercontent.com" style="width:100%;padding:6px 8px;border:1.5px solid #ddd;border-radius:6px;font-size:11px;font-family:monospace;margin-bottom:8px;outline:none">
+      <div id="drive-status" style="font-size:12px;margin-bottom:10px;min-height:18px"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
+        <button class="btn btn-primary" onclick="driveUpload()" style="padding:8px;font-size:13px">⬆️ Driveに保存</button>
+        <button class="btn btn-primary" onclick="driveDownload()" style="padding:8px;font-size:13px">⬇️ Driveから読込</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:#555;cursor:pointer">
+          <input type="checkbox" id="drive-auto" onchange="toggleAutoSync()"> 編集時に自動保存
+        </label>
+        <button class="btn btn-cancel" style="padding:6px;font-size:11px" onclick="driveSignOut()">サインアウト</button>
+      </div>
+      <div style="margin-top:8px;text-align:center">
+        <a href="#" onclick="openDriveSetupGuide();return false" style="font-size:11px;color:#0f3460;text-decoration:underline">📖 Client ID 取得手順を表示</a>
+      </div>
+    </div>
+
+    <div style="border:1px solid #eee;border-radius:10px;padding:14px;margin-bottom:12px">
+      <div style="font-weight:700;font-size:13px;margin-bottom:8px;color:#0f3460">📤 エクスポート</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary" onclick="exportJSON()">JSONファイル保存</button>
+        <button class="btn btn-cancel" onclick="copyJSON()">テキストコピー</button>
+      </div>
+    </div>
+
+    <div style="border:1px solid #eee;border-radius:10px;padding:14px;margin-bottom:12px">
+      <div style="font-weight:700;font-size:13px;margin-bottom:8px;color:#0f3460">📥 インポート</div>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <label class="btn btn-primary" style="display:flex;align-items:center;justify-content:center;cursor:pointer">
+          ファイル選択
+          <input type="file" accept=".json,application/json" onchange="importFile(event)" style="display:none">
+        </label>
+      </div>
+      <textarea id="import-text" placeholder="または JSON テキストを貼り付け..." style="width:100%;min-height:80px;border:1.5px solid #e0e0e0;border-radius:8px;padding:8px;font-size:12px;font-family:monospace;outline:none"></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn btn-primary" onclick="importPasted('merge')">マージで取込</button>
+        <button class="btn btn-danger" onclick="importPasted('replace')">置換で取込</button>
+      </div>
+      <p style="font-size:11px;color:#888;margin-top:8px">
+        マージ＝既存と統合（同じ日付は新しい方優先）／置換＝全データを上書き
+      </p>
+    </div>
+
+    <div style="background:#f8f9ff;padding:12px;border-radius:10px;font-size:11px;color:#555;line-height:1.6">
+      💡 <b>記録件数:</b> <span id="record-count">0</span> 件<br>
+      💡 ファイルを iCloud Drive / Dropbox / Google Drive などのクラウドに保存しておくと、別端末でもすぐ取り込めます。
+    </div>
+
+    <div class="modal-btns">
+      <button class="btn btn-cancel" onclick="closeSyncModal()">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── State ──────────────────────────────────────────
+const today = new Date();
+let curYear = today.getFullYear();
+let curMonth = today.getMonth(); // 0-indexed
+let viewYear = curYear;
+let modalDate = null; // "YYYY-MM-DD"
+
+// Storage helpers
+function loadData() {
+  return JSON.parse(localStorage.getItem('attendance') || '{}');
+}
+function saveData(data) {
+  localStorage.setItem('attendance', JSON.stringify(data));
+}
+function getRecord(dateStr) {
+  return loadData()[dateStr] || null;
+}
+function setRecord(dateStr, rec) {
+  const data = loadData();
+  data[dateStr] = rec;
+  saveData(data);
+}
+function deleteRecordData(dateStr) {
+  const data = loadData();
+  delete data[dateStr];
+  saveData(data);
+}
+
+// ── Helpers ────────────────────────────────────────
+function dateStr(y, m, d) {
+  return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+}
+function calcWorkHours(inT, outT, breakMin) {
+  if (!inT || !outT) return 0;
+  const [ih, im] = inT.split(':').map(Number);
+  const [oh, om] = outT.split(':').map(Number);
+  let mins = (oh * 60 + om) - (ih * 60 + im) - (breakMin || 0);
+  return Math.max(0, mins / 60);
+}
+function calcOvertime(workHours) {
+  return Math.max(0, workHours - 8);
+}
+function fmtHours(h) {
+  const hh = Math.floor(h);
+  const mm = Math.round((h - hh) * 60);
+  return `${hh}h${mm > 0 ? mm + 'm' : ''}`;
+}
+function statusLabel(s) {
+  return {present:'出勤',absent:'欠勤',late:'遅刻',leave:'有給',holiday:'休日'}[s] || s;
+}
+function statusClass(s) {
+  return {present:'badge-present',absent:'badge-absent',late:'badge-late',leave:'badge-leave',holiday:'badge-holiday'}[s] || '';
+}
+function miniClass(s) {
+  return {present:'mc-present',absent:'mc-absent',late:'mc-late',leave:'mc-leave',holiday:'mc-holiday'}[s] || 'mc-none';
+}
+
+function isWeekend(y, m, d) {
+  const dow = new Date(y, m, d).getDay();
+  return dow === 0 || dow === 6;
+}
+function isToday(y, m, d) {
+  return y === today.getFullYear() && m === today.getMonth() && d === today.getDate();
+}
+
+// ── Monthly View ───────────────────────────────────
+function renderMonthly() {
+  const y = curYear, m = curMonth;
+  document.getElementById('month-title').textContent =
+    `${y}年 ${m+1}月`;
+
+  const firstDow = new Date(y, m, 1).getDay();
+  const daysInMonth = new Date(y, m+1, 0).getDate();
+  const data = loadData();
+
+  // Stats
+  let present=0, absent=0, late=0, totalWork=0, totalOT=0;
+  for (let d=1; d<=daysInMonth; d++) {
+    const k = dateStr(y, m, d);
+    const r = data[k];
+    if (!r) continue;
+    if (r.status === 'present' || r.status === 'late') {
+      const wh = calcWorkHours(r.in, r.out, r.break);
+      totalWork += wh;
+      totalOT += calcOvertime(wh);
+    }
+    if (r.status === 'present') present++;
+    if (r.status === 'absent') absent++;
+    if (r.status === 'late') late++;
+  }
+
+  const sal = calcMonthSalary(y, m);
+  document.getElementById('month-stats').innerHTML = `
+    <div class="stat-card green"><div class="val">${present}</div><div class="lbl">出勤日数</div></div>
+    <div class="stat-card red"><div class="val">${absent}</div><div class="lbl">欠勤日数</div></div>
+    <div class="stat-card orange"><div class="val">${late}</div><div class="lbl">遅刻日数</div></div>
+    <div class="stat-card"><div class="val">${fmtHours(totalOT)}</div><div class="lbl">残業時間合計</div></div>
+  `;
+
+  // Salary card
+  const salEl = document.getElementById('salary-card');
+  if (sal.total > 0 || sal.settings.hourly > 0 || sal.settings.monthly > 0) {
+    const baseLabel = sal.settings.mode === 'monthly' ? '基本給' : '基本給(時給×時間)';
+    salEl.style.display = 'block';
+    salEl.innerHTML = `
+      <div class="sal-header">
+        <div class="sal-title">💰 ${y}年${m+1}月 給与（額面）</div>
+        <div class="sal-total">${fmtYen(sal.total)}</div>
+      </div>
+      <div class="sal-breakdown">
+        <div class="sal-row"><span>${baseLabel}</span><span>${fmtYen(sal.settings.mode === 'monthly' ? sal.base : sal.regular)}</span></div>
+        ${sal.settings.mode === 'monthly' && sal.regular > 0 ? `<div class="sal-row" style="display:none"><span>時給分</span><span>${fmtYen(sal.regular)}</span></div>` : ''}
+        <div class="sal-row"><span>残業手当 (${fmtHours(sal.otHours)} × ${sal.settings.otRate})</span><span>${fmtYen(sal.overtime)}</span></div>
+        ${sal.holiday > 0 ? `<div class="sal-row"><span>休日労働手当</span><span>${fmtYen(sal.holiday)}</span></div>` : ''}
+        ${sal.transport > 0 ? `<div class="sal-row"><span>交通費</span><span>${fmtYen(sal.transport)}</span></div>` : ''}
+        <div class="sal-row sal-sub"><span>総労働時間</span><span>${fmtHours(sal.totalWH)}</span></div>
+      </div>
+    `;
+  } else {
+    salEl.style.display = 'none';
+    salEl.innerHTML = '';
+  }
+
+  // Calendar grid
+  const grid = document.getElementById('cal-grid');
+  grid.innerHTML = '';
+
+  // Empty cells
+  for (let i=0; i<firstDow; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'cal-cell empty';
+    grid.appendChild(cell);
+  }
+
+  for (let d=1; d<=daysInMonth; d++) {
+    const k = dateStr(y, m, d);
+    const r = data[k];
+    const cell = document.createElement('div');
+    cell.className = 'cal-cell' + (isToday(y,m,d) ? ' today' : '');
+    cell.onclick = () => openModal(k);
+
+    let inner = `<div class="day-num">${d}</div>`;
+    if (r) {
+      inner += `<span class="record-badge ${statusClass(r.status)}">${statusLabel(r.status)}</span>`;
+      if (r.in && r.out) {
+        const wh = calcWorkHours(r.in, r.out, r.break);
+        inner += `<div class="work-hours">${r.in}〜${r.out}</div>`;
+        inner += `<div class="work-hours">実働 ${fmtHours(wh)}</div>`;
+      }
+      if (r.note) inner += `<div class="work-hours" style="color:#aaa">${r.note.substring(0,12)}</div>`;
+    } else if (isWeekend(y,m,d)) {
+      inner += `<span class="record-badge badge-holiday" style="opacity:0.5">休日</span>`;
+    }
+
+    cell.innerHTML = inner;
+    grid.appendChild(cell);
+  }
+}
+
+function changeMonth(dir) {
+  curMonth += dir;
+  if (curMonth < 0) { curMonth = 11; curYear--; }
+  if (curMonth > 11) { curMonth = 0; curYear++; }
+  renderMonthly();
+}
+
+// ── Yearly View ────────────────────────────────────
+function renderYearly() {
+  document.getElementById('year-title').textContent = `${viewYear}年`;
+  const data = loadData();
+
+  // Year totals
+  let yPresent=0, yAbsent=0, yLate=0, yLeave=0, yWork=0, yOT=0;
+  const monthCounts = Array(12).fill(0);
+
+  for (let m=0; m<12; m++) {
+    const days = new Date(viewYear, m+1, 0).getDate();
+    for (let d=1; d<=days; d++) {
+      const k = dateStr(viewYear, m, d);
+      const r = data[k];
+      if (!r) continue;
+      if (r.status === 'present') { yPresent++; monthCounts[m]++; }
+      if (r.status === 'absent') yAbsent++;
+      if (r.status === 'late') { yLate++; monthCounts[m]++; }
+      if (r.status === 'leave') yLeave++;
+      if (r.status === 'present' || r.status === 'late') {
+        const wh = calcWorkHours(r.in, r.out, r.break);
+        yWork += wh;
+        yOT += calcOvertime(wh);
+      }
+    }
+  }
+
+  // Year salary
+  const monthlySalaries = [];
+  let yearTotal = 0, yearBase = 0, yearOT = 0, yearHol = 0, yearTrans = 0;
+  for (let m = 0; m < 12; m++) {
+    const ms = calcMonthSalary(viewYear, m);
+    monthlySalaries.push(ms);
+    yearTotal += ms.total;
+    yearBase += ms.base + ms.regular;
+    yearOT += ms.overtime;
+    yearHol += ms.holiday;
+    yearTrans += ms.transport;
+  }
+  const ysCard = document.getElementById('year-salary-card');
+  if (yearTotal > 0) {
+    const maxSal = Math.max(...monthlySalaries.map(s => s.total), 1);
+    ysCard.style.display = 'block';
+    ysCard.innerHTML = `
+      <div class="ys-total-row">
+        <div>
+          <div class="ys-total-label">💰 ${viewYear}年 年収（額面）</div>
+          <div style="font-size:11px;color:#888;margin-top:2px">基本 ${fmtYen(yearBase)} / 残業 ${fmtYen(yearOT)} ${yearHol > 0 ? '/ 休日 ' + fmtYen(yearHol) : ''} ${yearTrans > 0 ? '/ 交通費 ' + fmtYen(yearTrans) : ''}</div>
+        </div>
+        <div class="ys-total-val">${fmtYen(yearTotal)}<span class="ys-total-sub">月平均 ${fmtYen(yearTotal/12)}</span></div>
+      </div>
+      <div style="font-size:12px;font-weight:600;color:#7a5e00;margin-bottom:8px">月別給与</div>
+      <div class="ys-month-bars">
+        ${monthlySalaries.map(s => {
+          const h = Math.round((s.total / maxSal) * 80);
+          return `<div class="ys-month-bar">
+            <div class="ys-bar-num">${s.total > 0 ? Math.round(s.total/1000) + 'k' : ''}</div>
+            <div class="ys-bar-fill" style="height:${h}px" title="${fmtYen(s.total)}"></div>
+          </div>`;
+        }).join('')}
+      </div>
+      <div class="ys-month-labels">
+        ${['1','2','3','4','5','6','7','8','9','10','11','12'].map(m => `<div>${m}月</div>`).join('')}
+      </div>
+    `;
+  } else {
+    ysCard.style.display = 'none';
+  }
+
+  document.getElementById('year-stats').innerHTML = `
+    <div class="ys-item"><div class="ys-val" style="color:#27ae60">${yPresent}</div><div class="ys-lbl">出勤日</div></div>
+    <div class="ys-item"><div class="ys-val" style="color:#e74c3c">${yAbsent}</div><div class="ys-lbl">欠勤日</div></div>
+    <div class="ys-item"><div class="ys-val" style="color:#d68910">${yLate}</div><div class="ys-lbl">遅刻日</div></div>
+    <div class="ys-item"><div class="ys-val" style="color:#5c6bc0">${yLeave}</div><div class="ys-lbl">有給日</div></div>
+    <div class="ys-item"><div class="ys-val" style="color:#0f3460">${Math.round(yWork)}</div><div class="ys-lbl">総労働時間</div></div>
+    <div class="ys-item"><div class="ys-val" style="color:#e94560">${fmtHours(yOT)}</div><div class="ys-lbl">総残業時間</div></div>
+  `;
+
+  // Bar chart
+  const maxCount = Math.max(...monthCounts, 1);
+  const chartEl = document.getElementById('bar-chart');
+  const months = ['1','2','3','4','5','6','7','8','9','10','11','12'];
+  chartEl.innerHTML = months.map((mn, i) => {
+    const h = Math.round((monthCounts[i] / maxCount) * 70);
+    return `<div class="bar-col">
+      <div class="bar-val">${monthCounts[i] || ''}</div>
+      <div class="bar-fill" style="height:${h}px"></div>
+      <div class="bar-lbl">${mn}月</div>
+    </div>`;
+  }).join('');
+
+  // Mini calendars
+  const yearGrid = document.getElementById('year-grid');
+  yearGrid.innerHTML = '';
+  const monthNames = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+
+  for (let m=0; m<12; m++) {
+    const firstDow = new Date(viewYear, m, 1).getDay();
+    const daysInMonth = new Date(viewYear, m+1, 0).getDate();
+    let mp=0, ma=0, ml=0;
+
+    let cells = '';
+    for (let i=0; i<firstDow; i++) cells += `<div class="mini-cell empty"></div>`;
+    for (let d=1; d<=daysInMonth; d++) {
+      const k = dateStr(viewYear, m, d);
+      const r = data[k];
+      let cls = r ? miniClass(r.status) : (isWeekend(viewYear,m,d) ? 'mc-holiday' : 'mc-none');
+      const todayCls = isToday(viewYear, m, d) ? ' mc-today' : '';
+      if (r) {
+        if (r.status==='present') mp++;
+        if (r.status==='absent') ma++;
+        if (r.status==='late') ml++;
+      }
+      cells += `<div class="mini-cell ${cls}${todayCls}" title="${k}" onclick="jumpToMonth(${viewYear},${m},${d})">${d}</div>`;
+    }
+
+    const div = document.createElement('div');
+    div.className = 'mini-month';
+    div.innerHTML = `
+      <div class="mini-month-title">${monthNames[m]}</div>
+      <div class="mini-cal-header">
+        <span>日</span><span>月</span><span>火</span><span>水</span>
+        <span>木</span><span>金</span><span>土</span>
+      </div>
+      <div class="mini-grid">${cells}</div>
+      <div class="mini-month-stats">
+        <span class="mini-stat ms-present">出 ${mp}</span>
+        <span class="mini-stat ms-absent">欠 ${ma}</span>
+        ${ml>0 ? `<span class="mini-stat ms-late">遅 ${ml}</span>` : ''}
+      </div>
+    `;
+    yearGrid.appendChild(div);
+  }
+}
+
+function changeYear(dir) {
+  viewYear += dir;
+  renderYearly();
+}
+
+function jumpToMonth(y, m, d) {
+  curYear = y; curMonth = m;
+  switchView('monthly');
+  setTimeout(() => openModal(dateStr(y, m, d)), 100);
+}
+
+// ── Modal ──────────────────────────────────────────
+function openModal(k) {
+  modalDate = k;
+  const [y, mo, d] = k.split('-');
+  document.getElementById('modal-date').textContent = `${y}年${parseInt(mo)}月${parseInt(d)}日`;
+
+  const r = getRecord(k);
+  document.getElementById('f-status').value = r ? r.status : 'present';
+  document.getElementById('f-in').value = r ? (r.in || '09:00') : '09:00';
+  document.getElementById('f-out').value = r ? (r.out || '18:00') : '18:00';
+  document.getElementById('f-break').value = r ? (r.break ?? 60) : 60;
+  document.getElementById('f-note').value = r ? (r.note || '') : '';
+  document.getElementById('btn-delete').style.display = r ? 'block' : 'none';
+
+  updateTimeFields();
+  updateOvertime();
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+}
+function closeModalIfOutside(e) {
+  if (e.target === document.getElementById('modal-overlay')) closeModal();
+}
+
+document.getElementById('f-status').addEventListener('change', updateTimeFields);
+document.getElementById('f-in').addEventListener('change', updateOvertime);
+document.getElementById('f-out').addEventListener('change', updateOvertime);
+document.getElementById('f-break').addEventListener('input', updateOvertime);
+
+function updateTimeFields() {
+  const s = document.getElementById('f-status').value;
+  const show = s === 'present' || s === 'late';
+  document.getElementById('time-fields').style.display = show ? 'block' : 'none';
+}
+function updateOvertime() {
+  const inT = document.getElementById('f-in').value;
+  const outT = document.getElementById('f-out').value;
+  const brk = parseInt(document.getElementById('f-break').value) || 0;
+  const wh = calcWorkHours(inT, outT, brk);
+  const ot = calcOvertime(wh);
+  document.getElementById('f-overtime').value = ot > 0 ? fmtHours(ot) : 'なし';
+}
+
+function saveRecord() {
+  const status = document.getElementById('f-status').value;
+  const rec = {
+    status,
+    in: document.getElementById('f-in').value,
+    out: document.getElementById('f-out').value,
+    break: parseInt(document.getElementById('f-break').value) || 0,
+    note: document.getElementById('f-note').value.trim(),
+    updatedAt: new Date().toISOString()
+  };
+  setRecord(modalDate, rec);
+  closeModal();
+  renderCurrent();
+  showToast('保存しました', 'success');
+}
+
+function deleteRecord() {
+  deleteRecordData(modalDate);
+  closeModal();
+  renderCurrent();
+  showToast('削除しました');
+}
+
+// ── View switching ─────────────────────────────────
+function switchView(v) {
+  document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById('view-' + v).classList.add('active');
+  document.querySelectorAll('.tab-btn')[v === 'monthly' ? 0 : 1].classList.add('active');
+  if (v === 'monthly') renderMonthly();
+  else { viewYear = curYear; renderYearly(); }
+}
+
+function renderCurrent() {
+  const isMonthly = document.getElementById('view-monthly').classList.contains('active');
+  if (isMonthly) renderMonthly(); else renderYearly();
+}
+
+// ── Toast ──────────────────────────────────────────
+function showToast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (type ? ' ' + type : '');
+  setTimeout(() => t.className = 'toast', 2200);
+}
+
+// ── Sync (Export / Import) ─────────────────────────
+function openSyncModal() {
+  const data = loadData();
+  document.getElementById('record-count').textContent = Object.keys(data).length;
+  document.getElementById('import-text').value = '';
+  document.getElementById('sync-overlay').classList.add('open');
+}
+function closeSyncModal() {
+  document.getElementById('sync-overlay').classList.remove('open');
+}
+function closeSyncIfOutside(e) {
+  if (e.target === document.getElementById('sync-overlay')) closeSyncModal();
+}
+
+function exportJSON() {
+  const data = loadData();
+  const payload = {
+    app: 'attendance',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    records: data
+  };
+  const json = JSON.stringify(payload, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const ts = new Date().toISOString().replace(/[:.]/g,'-').substring(0,19);
+  a.href = url;
+  a.download = `attendance-${ts}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('エクスポートしました', 'success');
+}
+
+async function copyJSON() {
+  const data = loadData();
+  const payload = { app:'attendance', version:1, exportedAt:new Date().toISOString(), records:data };
+  const json = JSON.stringify(payload);
+  try {
+    await navigator.clipboard.writeText(json);
+    showToast('クリップボードにコピーしました', 'success');
+  } catch(e) {
+    // Fallback
+    const ta = document.createElement('textarea');
+    ta.value = json;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('コピーしました', 'success');
+  }
+}
+
+function importFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const obj = JSON.parse(ev.target.result);
+      applyImport(obj, 'merge');
+    } catch(err) {
+      showToast('JSONの読み込みに失敗しました');
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+
+function importPasted(mode) {
+  const txt = document.getElementById('import-text').value.trim();
+  if (!txt) { showToast('JSONを貼り付けてください'); return; }
+  try {
+    const obj = JSON.parse(txt);
+    applyImport(obj, mode);
+  } catch(err) {
+    showToast('JSONの形式が正しくありません');
+  }
+}
+
+function applyImport(obj, mode) {
+  // Accept either { records: {...} } or raw {...}
+  let incoming = null;
+  if (obj && typeof obj === 'object') {
+    if (obj.records && typeof obj.records === 'object') incoming = obj.records;
+    else incoming = obj;
+  }
+  if (!incoming) { showToast('データが見つかりません'); return; }
+
+  // Validate keys look like dates
+  const keys = Object.keys(incoming);
+  const validKeys = keys.filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k));
+  if (validKeys.length === 0) { showToast('有効な勤怠データがありません'); return; }
+
+  if (mode === 'replace') {
+    if (!confirm(`現在のデータを全て削除して、${validKeys.length}件のデータで置き換えますか？`)) return;
+    const replaced = {};
+    validKeys.forEach(k => replaced[k] = incoming[k]);
+    saveData(replaced);
+  } else {
+    // Merge: incoming wins on same key if newer or no updatedAt comparison; default newer wins
+    const current = loadData();
+    let added = 0, updated = 0;
+    validKeys.forEach(k => {
+      const incRec = incoming[k];
+      const curRec = current[k];
+      if (!curRec) { current[k] = incRec; added++; }
+      else {
+        const a = curRec.updatedAt || '';
+        const b = incRec.updatedAt || '';
+        if (b >= a) { current[k] = incRec; updated++; }
+      }
+    });
+    saveData(current);
+    showToast(`追加 ${added}件 / 更新 ${updated}件`, 'success');
+    closeSyncModal();
+    renderCurrent();
+    return;
+  }
+
+  showToast(`${validKeys.length}件をインポートしました`, 'success');
+  closeSyncModal();
+  renderCurrent();
+}
+
+// ── Salary Settings & Calculation ──────────────────
+function loadSettings() {
+  const def = {
+    mode: 'hourly',
+    hourly: 1200,
+    monthly: 250000,
+    otHourly: 0,
+    otRate: 1.25,
+    holRate: 1.35,
+    transport: 0,
+    workHours: 8
+  };
+  try {
+    const s = JSON.parse(localStorage.getItem('salary_settings') || '{}');
+    return Object.assign(def, s);
+  } catch(e) { return def; }
+}
+function saveSettingsData(s) {
+  localStorage.setItem('salary_settings', JSON.stringify(s));
+}
+
+function openSettingsModal() {
+  const s = loadSettings();
+  document.getElementById('s-mode').value = s.mode;
+  document.getElementById('s-hourly').value = s.hourly || '';
+  document.getElementById('s-monthly').value = s.monthly || '';
+  document.getElementById('s-ot-hourly').value = s.otHourly || '';
+  document.getElementById('s-ot-rate').value = s.otRate;
+  document.getElementById('s-hol-rate').value = s.holRate;
+  document.getElementById('s-transport').value = s.transport || 0;
+  document.getElementById('s-work-hours').value = s.workHours;
+  toggleSalaryMode();
+  document.getElementById('settings-overlay').classList.add('open');
+}
+function closeSettingsModal() {
+  document.getElementById('settings-overlay').classList.remove('open');
+}
+function closeSettingsIfOutside(e) {
+  if (e.target === document.getElementById('settings-overlay')) closeSettingsModal();
+}
+function toggleSalaryMode() {
+  const m = document.getElementById('s-mode').value;
+  document.getElementById('hourly-fields').style.display = m === 'hourly' ? 'block' : 'none';
+  document.getElementById('monthly-fields').style.display = m === 'monthly' ? 'block' : 'none';
+}
+function saveSettings() {
+  const s = {
+    mode: document.getElementById('s-mode').value,
+    hourly: parseFloat(document.getElementById('s-hourly').value) || 0,
+    monthly: parseFloat(document.getElementById('s-monthly').value) || 0,
+    otHourly: parseFloat(document.getElementById('s-ot-hourly').value) || 0,
+    otRate: parseFloat(document.getElementById('s-ot-rate').value) || 1.25,
+    holRate: parseFloat(document.getElementById('s-hol-rate').value) || 1.35,
+    transport: parseFloat(document.getElementById('s-transport').value) || 0,
+    workHours: parseFloat(document.getElementById('s-work-hours').value) || 8
+  };
+  saveSettingsData(s);
+  closeSettingsModal();
+  showToast('設定を保存しました', 'success');
+  renderCurrent();
+}
+
+// Calculate salary for a single day
+function calcDaySalary(rec, settings) {
+  if (!rec) return null;
+  const wh = (rec.in && rec.out) ? calcWorkHours(rec.in, rec.out, rec.break) : 0;
+  const isWork = rec.status === 'present' || rec.status === 'late';
+  const isHolWork = rec.status === 'holiday' && wh > 0;
+  if (!isWork && !isHolWork) return { workHours: 0, regular: 0, overtime: 0, holiday: 0, transport: 0, total: 0 };
+
+  const otHourlyEffective = settings.mode === 'monthly'
+    ? (settings.otHourly > 0 ? settings.otHourly : Math.round((settings.monthly || 0) / 160))
+    : settings.hourly;
+
+  let regular = 0, overtime = 0, holiday = 0, transport = 0;
+
+  if (isHolWork) {
+    holiday = wh * otHourlyEffective * settings.holRate;
+    transport = settings.transport;
+  } else {
+    const reg = Math.min(wh, settings.workHours);
+    const ot = Math.max(0, wh - settings.workHours);
+    if (settings.mode === 'hourly') {
+      regular = reg * settings.hourly;
+    }
+    overtime = ot * otHourlyEffective * settings.otRate;
+    transport = settings.transport;
+  }
+  return {
+    workHours: wh,
+    regular: Math.round(regular),
+    overtime: Math.round(overtime),
+    holiday: Math.round(holiday),
+    transport: Math.round(transport),
+    total: Math.round(regular + overtime + holiday + transport)
+  };
+}
+
+// Calculate salary for a month
+function calcMonthSalary(year, month) {
+  const settings = loadSettings();
+  const data = loadData();
+  const days = new Date(year, month + 1, 0).getDate();
+  let regular = 0, overtime = 0, holiday = 0, transport = 0, totalWH = 0, otHours = 0;
+
+  for (let d = 1; d <= days; d++) {
+    const k = dateStr(year, month, d);
+    const r = data[k];
+    if (!r) continue;
+    const day = calcDaySalary(r, settings);
+    if (!day) continue;
+    regular += day.regular;
+    overtime += day.overtime;
+    holiday += day.holiday;
+    transport += day.transport;
+    totalWH += day.workHours;
+    if (day.workHours > settings.workHours) otHours += day.workHours - settings.workHours;
+  }
+
+  // Monthly base for salaried mode
+  let base = 0;
+  if (settings.mode === 'monthly' && settings.monthly > 0) {
+    // Pay base if there's any work day
+    const hasWork = Object.keys(data).some(k => {
+      if (!k.startsWith(`${year}-${String(month+1).padStart(2,'0')}`)) return false;
+      const r = data[k];
+      return r && (r.status === 'present' || r.status === 'late');
+    });
+    if (hasWork) base = settings.monthly;
+  }
+
+  const total = base + regular + overtime + holiday + transport;
+  return { base, regular, overtime, holiday, transport, total, totalWH, otHours, settings };
+}
+
+function fmtYen(n) {
+  return '¥' + Math.round(n).toLocaleString('ja-JP');
+}
+
+// ── Google Drive Auto-Sync ─────────────────────────
+const DRIVE_FILE_NAME = 'attendance-data.json';
+const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
+let driveTokenClient = null;
+let driveAccessToken = null;
+let driveTokenExpiry = 0;
+let driveFileId = null;
+let pendingDriveAction = null;
+let autoSyncTimer = null;
+
+function getClientId() { return localStorage.getItem('drive_client_id') || ''; }
+function setClientId(id) { localStorage.setItem('drive_client_id', id.trim()); }
+function getAutoSync() { return localStorage.getItem('drive_auto_sync') === '1'; }
+function setAutoSync(v) { localStorage.setItem('drive_auto_sync', v ? '1' : '0'); }
+
+function initDriveTokenClient() {
+  const id = getClientId();
+  if (!id) return false;
+  if (!window.google || !window.google.accounts || !window.google.accounts.oauth2) {
+    return false;
+  }
+  driveTokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: id,
+    scope: DRIVE_SCOPE,
+    callback: (resp) => {
+      if (resp && resp.access_token) {
+        driveAccessToken = resp.access_token;
+        driveTokenExpiry = Date.now() + ((resp.expires_in || 3600) - 60) * 1000;
+        if (pendingDriveAction) {
+          const fn = pendingDriveAction;
+          pendingDriveAction = null;
+          fn();
+        } else {
+          updateDriveStatus();
+        }
+      } else {
+        showToast('サインインに失敗しました');
+      }
+    },
+    error_callback: (err) => {
+      console.error('OAuth error:', err);
+      showToast('認証エラー: ' + (err.type || 'unknown'));
+    }
+  });
+  return true;
+}
+
+function ensureDriveAuth(action) {
+  const id = getClientId();
+  if (!id) {
+    showToast('Client ID を入力してください');
+    return;
+  }
+  if (driveAccessToken && Date.now() < driveTokenExpiry) {
+    action();
+    return;
+  }
+  if (!driveTokenClient) {
+    if (!initDriveTokenClient()) {
+      showToast('Google ライブラリ読込中... 数秒後に再試行');
+      return;
+    }
+  }
+  pendingDriveAction = action;
+  driveTokenClient.requestAccessToken({ prompt: driveAccessToken ? '' : 'consent' });
+}
+
+async function findDriveFile() {
+  const url = 'https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&fields=files(id,name,modifiedTime)&q=' +
+    encodeURIComponent("name='" + DRIVE_FILE_NAME + "' and trashed=false");
+  const r = await fetch(url, { headers: { Authorization: 'Bearer ' + driveAccessToken } });
+  if (!r.ok) throw new Error('一覧取得失敗 ' + r.status);
+  const data = await r.json();
+  return (data.files && data.files[0]) || null;
+}
+
+async function driveUploadCore(silent) {
+  const records = loadData();
+  const payload = {
+    app: 'attendance', version: 1,
+    exportedAt: new Date().toISOString(),
+    records
+  };
+  const content = JSON.stringify(payload, null, 2);
+
+  let target = driveFileId;
+  if (!target) {
+    const existing = await findDriveFile();
+    target = existing ? existing.id : null;
+    driveFileId = target;
+  }
+
+  if (target) {
+    const r = await fetch(
+      `https://www.googleapis.com/upload/drive/v3/files/${target}?uploadType=media`,
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: 'Bearer ' + driveAccessToken,
+          'Content-Type': 'application/json'
+        },
+        body: content
+      }
+    );
+    if (!r.ok) throw new Error('更新失敗 ' + r.status);
+  } else {
+    const metadata = { name: DRIVE_FILE_NAME, parents: ['appDataFolder'] };
+    const boundary = '-------' + Math.random().toString(36).substring(2);
+    const body =
+      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n` +
+      JSON.stringify(metadata) +
+      `\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n` +
+      content +
+      `\r\n--${boundary}--`;
+    const r = await fetch(
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer ' + driveAccessToken,
+          'Content-Type': 'multipart/related; boundary=' + boundary
+        },
+        body
+      }
+    );
+    if (!r.ok) throw new Error('作成失敗 ' + r.status);
+    const data = await r.json();
+    driveFileId = data.id;
+  }
+  if (!silent) showToast('Drive に保存しました', 'success');
+  updateDriveStatus();
+}
+
+function driveUpload() {
+  ensureDriveAuth(async () => {
+    try { await driveUploadCore(false); }
+    catch (e) { console.error(e); showToast('保存失敗: ' + e.message); }
+  });
+}
+
+function driveDownload() {
+  ensureDriveAuth(async () => {
+    try {
+      const existing = await findDriveFile();
+      if (!existing) { showToast('Drive にデータがありません'); return; }
+      driveFileId = existing.id;
+      const r = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${existing.id}?alt=media`,
+        { headers: { Authorization: 'Bearer ' + driveAccessToken } }
+      );
+      if (!r.ok) throw new Error('ダウンロード失敗 ' + r.status);
+      const obj = await r.json();
+      applyImport(obj, 'merge');
+      updateDriveStatus();
+    } catch (e) {
+      console.error(e); showToast('読込失敗: ' + e.message);
+    }
+  });
+}
+
+function driveSignOut() {
+  if (driveAccessToken && window.google?.accounts?.oauth2) {
+    google.accounts.oauth2.revoke(driveAccessToken, () => {});
+  }
+  driveAccessToken = null;
+  driveTokenExpiry = 0;
+  driveFileId = null;
+  updateDriveStatus();
+  showToast('サインアウトしました');
+}
+
+async function updateDriveStatus() {
+  const el = document.getElementById('drive-status');
+  if (!el) return;
+  const id = getClientId();
+  if (!id) {
+    el.innerHTML = '<span style="color:#999">⚠️ Client ID 未設定</span>';
+    return;
+  }
+  if (!driveAccessToken) {
+    el.innerHTML = '<span style="color:#888">未サインイン（保存/読込ボタンでサインイン）</span>';
+    return;
+  }
+  el.innerHTML = '<span style="color:#27ae60">✓ サインイン中</span>';
+  try {
+    const f = await findDriveFile();
+    if (f) {
+      driveFileId = f.id;
+      const t = new Date(f.modifiedTime).toLocaleString('ja-JP');
+      el.innerHTML += `<br><span style="font-size:11px;color:#666">Drive最終更新: ${t}</span>`;
+    } else {
+      el.innerHTML += '<br><span style="font-size:11px;color:#999">Driveにデータなし</span>';
+    }
+  } catch (e) {}
+}
+
+function toggleAutoSync() {
+  const v = document.getElementById('drive-auto').checked;
+  setAutoSync(v);
+  showToast(v ? '自動保存ON' : '自動保存OFF');
+}
+
+function scheduleAutoSync() {
+  if (!getAutoSync()) return;
+  if (!getClientId()) return;
+  clearTimeout(autoSyncTimer);
+  autoSyncTimer = setTimeout(() => {
+    if (driveAccessToken && Date.now() < driveTokenExpiry) {
+      driveUploadCore(true).catch(e => console.warn('auto-sync failed', e));
+    }
+  }, 1500);
+}
+
+function openDriveSetupGuide() {
+  const guide = `【Google OAuth Client ID 取得手順】
+
+1. https://console.cloud.google.com/ を開く
+2. 上部「プロジェクトを選択」→「新しいプロジェクト」→ 名前は何でもOK（例: attendance）→ 作成
+3. 左メニュー「APIとサービス」→「ライブラリ」
+4. 「Google Drive API」を検索 → クリック →「有効にする」
+5. 左メニュー「APIとサービス」→「OAuth同意画面」
+   - User Type: 外部 → 作成
+   - アプリ名: 勤怠管理 / メール: 自分のGmail / デベロッパー連絡先: 自分のGmail → 保存
+   - スコープ画面はそのまま「保存して次へ」
+   - テストユーザー: 自分のGmail追加 → 保存
+6. 左メニュー「APIとサービス」→「認証情報」
+   - 「+ 認証情報を作成」→「OAuth クライアント ID」
+   - アプリケーションの種類: ウェブアプリケーション
+   - 名前: attendance
+   - 承認済みのJavaScript生成元: 以下を両方追加
+       http://localhost:8765
+       http://127.0.0.1:8765
+   - 作成 → 「クライアントID」をコピー
+7. アプリの「OAuth Client ID」欄に貼り付けて Enter
+
+⚠️ 重要: このアプリは file:// では動きません。
+ターミナルで:
+  cd "${'/Users/harakazuya/Desktop/cloude codo'}"
+  python3 -m http.server 8765
+を実行し、ブラウザで http://localhost:8765/attendance.html を開いてください。`;
+  alert(guide);
+  window.open('https://console.cloud.google.com/', '_blank');
+}
+
+// Initialize Drive section when GSI script loads
+function tryInitDriveSection() {
+  const input = document.getElementById('drive-client-id');
+  if (input) {
+    input.value = getClientId();
+    input.addEventListener('change', () => {
+      setClientId(input.value);
+      driveTokenClient = null;
+      driveAccessToken = null;
+      driveFileId = null;
+      initDriveTokenClient();
+      updateDriveStatus();
+      showToast('Client ID 保存しました');
+    });
+  }
+  const auto = document.getElementById('drive-auto');
+  if (auto) auto.checked = getAutoSync();
+  if (window.google && window.google.accounts) {
+    initDriveTokenClient();
+  }
+  updateDriveStatus();
+}
+
+// Hook into setRecord/deleteRecordData for auto-sync
+const _origSetRecord = setRecord;
+setRecord = function(k, r) { _origSetRecord(k, r); scheduleAutoSync(); };
+const _origDelete = deleteRecordData;
+deleteRecordData = function(k) { _origDelete(k); scheduleAutoSync(); };
+
+// Wait for GSI to load
+const _gsiCheck = setInterval(() => {
+  if (window.google && window.google.accounts) {
+    clearInterval(_gsiCheck);
+    initDriveTokenClient();
+    updateDriveStatus();
+  }
+}, 500);
+
+document.addEventListener('DOMContentLoaded', tryInitDriveSection);
+if (document.readyState !== 'loading') tryInitDriveSection();
+
+// ── Init ───────────────────────────────────────────
+renderMonthly();
+</script>
+</body>
+</html>
